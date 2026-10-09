@@ -1,0 +1,10 @@
+name = "top_products"
+engine = "polars"
+script = "top_products.py"
+
+[target]
+workspace_id = "00000000-0000-0000-0000-000000000000"  # replace with your workspace GUID
+lakehouse = "FabricDesktopDemo"
+schema = "sales"
+table = "top_products"
+mode = "overwrite"
