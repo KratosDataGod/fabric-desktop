@@ -41,7 +41,7 @@ fabric-desktop run ..\examples\sales_by_region.toml   # set workspace_id in the 
 
 ### Desktop app
 
-Every CI run on `main` builds `fabric-desktop.exe`. Open the latest run of the [CI workflow](https://github.com/KratosDataGod/fabric-desktop/actions/workflows/ci.yml?query=branch%3Amain), download the **fabric-desktop-windows** artifact, unzip it and double-click the exe. The app starts the sidecar with the `python` on your PATH, so install the sidecar first (above). To use a different interpreter, set `FABRIC_DESKTOP_PYTHON` to its full path.
+Download [fabric-desktop.exe](https://github.com/KratosDataGod/fabric-desktop/releases/download/latest/fabric-desktop.exe) from the **Releases** section of the repository page and double-click it. Every green build of `main` replaces it with a fresh copy. Windows SmartScreen may warn because the exe is not signed yet; choose **More info > Run anyway**. The app starts the sidecar with the `python` on your PATH, so install the sidecar first (above). To use a different interpreter, set `FABRIC_DESKTOP_PYTHON` to its full path.
 
 To build it yourself instead, install Rust and the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/), then:
 
