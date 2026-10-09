@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Fabric Desktop</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Fabric Desktop</h1>
+    <span id="user">Not signed in</span>
+    <button id="sign-in">Sign in</button>
+  </header>
+
+  <main>
+    <section>
+      <h2>Destination</h2>
+      <label>Workspace <select id="workspace"></select></label>
+      <ul id="lakehouses"></ul>
+      <div class="row">
+        <input id="new-lakehouse" placeholder="New lakehouse name">
+        <button id="create-lakehouse">Create lakehouse</button>
+      </div>
+      <div id="tables"></div>
+    </section>
+
+    <section>
+      <h2>Job</h2>
+      <div class="row">
+        <input id="job-path" placeholder="C:\path\to\job.toml">
+        <button id="preview">Preview locally</button>
+        <button id="run" class="primary">Run and publish</button>
+      </div>
+      <div id="result"></div>
+    </section>
+
+    <section>
+      <h2>Run history</h2>
+      <table id="history"><thead><tr><th>Finished</th><th>Job</th><th>Rows</th><th>Delta version</th><th>Seconds</th></tr></thead><tbody></tbody></table>
+    </section>
+  </main>
+
+  <p id="status" role="status"></p>
+  <script src="app.js"></script>
+</body>
+</html>

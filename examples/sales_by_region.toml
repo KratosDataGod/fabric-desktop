@@ -1,0 +1,15 @@
+name = "sales_by_region"
+engine = "duckdb"
+sql = """
+select region, sum(amount) as total_amount, count(*) as orders
+from read_csv_auto('data/sales.csv')
+group by region
+order by region
+"""
+
+[target]
+workspace_id = "00000000-0000-0000-0000-000000000000"  # replace with your workspace GUID
+lakehouse = "FabricDesktopDemo"
+schema = "dbo"
+table = "sales_by_region"
+mode = "overwrite"
