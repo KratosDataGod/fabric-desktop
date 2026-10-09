@@ -36,3 +36,24 @@ jobs:
           name: fabric-desktop-windows
           path: app/src-tauri/target/release/fabric-desktop.exe
           if-no-files-found: error
+
+  release:
+    # Every green build of main replaces the "latest" release with the new exe.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [sidecar, shell]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: fabric-desktop-windows
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest fabric-desktop.exe \
+            --title "Fabric Desktop (latest build)" \
+            --notes "Built automatically from ${GITHUB_SHA::7} on main. Download fabric-desktop.exe and double-click it." \
+            --target "$GITHUB_SHA"
