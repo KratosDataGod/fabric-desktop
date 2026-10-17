@@ -100,6 +100,13 @@ Printed output shows while a cell runs. Code stuck inside a library call can't a
 
 **Settings > Preview features > Run notebooks in their own process** (Preview) runs cells in a Python process of their own instead of inside the app's engine. Then **Restart kernel** on a stuck cell ends only that process, a crash in a library ends only that process (the cell says so and the next cell starts a fresh one), and the rest of the app keeps answering meanwhile. Switching it clears variables.
 
+With that setting on, two more Preview settings appear under it.
+
+- **Cell time limit.** A cell that runs longer is interrupted, and variables are kept. If it doesn't stop within 30 seconds, for example because it's waiting on one long call, its process is ended and variables are cleared. The cell says which happened and offers **Run again without the limit**. Proofs and side by side use the same limit, and a proof's receipt records the limits in force.
+- **Notebook memory limit.** If the notebook's process uses more memory than this, it's ended, so one notebook can't slow the whole PC. Variables are cleared and every cell is marked stale. Memory is checked every second, so a sudden spike can briefly go past the limit before it's seen. Fabric Desktop by KratosBI counts private bytes on Windows and resident memory on Linux, for that process only; processes it starts itself aren't counted.
+
+Your organization can set either limit in the policy file ([azure-setup.md](azure-setup.md)); Settings then shows it as set by your organization.
+
 ### Cell dependencies and stale outputs (Preview)
 
 **View > Dependencies** shows under each code cell what it depends on, read from its code: the variables it uses and which cell defined them, the tables and `Files/` paths it reads and which cell wrote them, what it writes, and which later cells use it. Names no cell defines are listed, so a typo or a missing import shows before you run. A dependency you know about but the code doesn't show can be declared in the cell's metadata as `depends_on` (a list of cell ids).
@@ -109,6 +116,16 @@ A cell gets a **Stale** tag when its output may not match the code above it: its
 **Run > Run stale cells** runs the stale cells again, in order. If any of them writes a table or file, installs packages or calls the network, it asks first and lists what each does, and offers to run only the cells before the first one.
 
 Dependencies come from reading the code, not from watching it run. A cell can still depend on something reading can't see (a value read from a file another program changed, a global set inside a function from a library), so **Run all** remains the way to be sure.
+
+### Variable history, watches and hidden state (Preview)
+
+The **Variables** pane (**View > Variables**) has three more parts for cells that run on this PC:
+
+- **Watches.** Type an expression, such as `len(events)` or `df["amount"].sum()`, and it's shown with its value after every cell, with its last few values so you can see which cell changed it. A watch runs as notebook code in the kernel, after the cell and as part of its run, so Cancel and the cell time limit cover it. Keep watches to reads: one that changes data changes your notebook's state too. Only expressions are accepted (not `x = 1`), up to 10 per notebook. A watch that takes longer than 2 seconds is paused until you click **Resume**. The expressions are saved in the notebook file; their values aren't. Proofs and side by side don't run watches, so they can't change what a proof compares.
+- **History.** For each cell run: the variables it added, changed and removed, with their type and size. Values aren't kept. History stays in memory for the current kernel only; it's cleared when the kernel restarts and isn't saved. Cell numbers are as they were when the cell ran.
+- **Hidden state.** After a cell runs, Fabric Desktop by KratosBI checks the names it uses against the cells in the notebook (the same reading of the code as Dependencies). If the cell uses a name that no cell defines, or that only a cell further down defines, but the kernel still has it from an earlier run, a warning shows under the cell: the cell works now but will fail in Fabric, in a proof and after a restart. If that name was set by a cell you've since deleted or changed in this session, **Insert that cell back above** puts its code back. **Ignore for this notebook** stops the warning for that name and is saved in the notebook file.
+
+None of these run for notebooks that run in Fabric.
 
 **What output looks like:**
 

@@ -39,7 +39,7 @@ from .incident_service import IncidentMixin
 from .git_service import GitMixin
 from .integrations.app_service import IntegrationsMixin
 from .kernel_proc import ProcessKernel
-from .notebook import Kernel, NotebookStore
+from .notebook import Kernel, NotebookStore, check_watches
 from .onelake import FileStore, TableCatalog
 from .publish import run_job
 
@@ -133,7 +133,9 @@ class Service(GitMixin, IncidentMixin, WorkloadMixin, ShortcutMixin, GovernanceM
             process = bool(app_settings.value("kernel_process"))
         load = lambda name: self.notebooks.load(name)["cells"]  # noqa: E731
         if process:
-            return ProcessKernel(token=self._token_for, load_notebook=load, variable_libraries=self._notebook_variables)
+            kernel = ProcessKernel(token=self._token_for, load_notebook=load, variable_libraries=self._notebook_variables)
+            _apply_limits(kernel)
+            return kernel
         return Kernel(token=self._token_for, load_notebook=load, variable_libraries=self._notebook_variables)
 
     def _kernel_busy(self) -> bool:
@@ -166,6 +168,8 @@ class Service(GitMixin, IncidentMixin, WorkloadMixin, ShortcutMixin, GovernanceM
                 old.close()
         else:
             app_settings.save(changes)
+        if isinstance(self.kernel, ProcessKernel):
+            _apply_limits(self.kernel)
         return self.app_settings()
 
     def sign_out(self) -> dict[str, Any]:
@@ -372,12 +376,17 @@ class Service(GitMixin, IncidentMixin, WorkloadMixin, ShortcutMixin, GovernanceM
     # The app runs cells with start_cell, then polls: output shows while the cell runs, and
     # interrupt_cell stops it without clearing variables.
     def start_cell(self, code: str, lakehouse_ref: dict[str, str] | None = None,
-                   notebook: str | None = None) -> dict[str, Any]:
+                   notebook: str | None = None, time_limit: bool = True,
+                   watches: list[str] | None = None) -> dict[str, Any]:
+        """``time_limit`` False runs this cell without the cell time limit (Run again without the limit).
+        ``watches`` are expressions shown in the Variables pane, evaluated after the cell."""
         if self.proof_busy():
             raise RuntimeError("A proof is running this notebook's kernel. Wait for it, or cancel it.")
         self._attach(lakehouse_ref)
         self.kernel.notebook_name = notebook or ""
-        return self.kernel.start(code)
+        if isinstance(self.kernel, ProcessKernel):
+            return self.kernel.start(code, time_limit=time_limit, watches=check_watches(watches))
+        return self.kernel.start(code, check_watches(watches))
 
     def poll_cell(self, version: int = -1, wait: float = 0.0) -> dict[str, Any]:
         return self.kernel.poll(version, wait)
@@ -520,3 +529,11 @@ def _json_value(value: Any) -> Any:
     if isinstance(value, float):
         return value if math.isfinite(value) else str(value)
     return str(value)
+
+
+def _apply_limits(kernel: ProcessKernel) -> None:
+    """The cell time and memory limits from Settings (or the organization's policy)."""
+    minutes = float(app_settings.value("cell_time_limit_minutes") or 0)
+    gb = float(app_settings.value("kernel_memory_limit_gb") or 0)
+    kernel.time_limit = minutes * 60 or None
+    kernel.memory_limit = int(gb * 1024 ** 3) or None

@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from . import depgraph, envprofile, proof, receipts, scorecard, verify, wizard
+from .notebook import check_watches
 from .fabric_run import TERMINAL, fabric_ipynb
 from .measure import RunMeter
 from .onelake import DFS_HOST, FileStore, storage_options
@@ -152,6 +153,25 @@ class ProveMixin:
     def prove_rules_get(self, name: str) -> dict[str, Any]:
         """The notebook's proof contract: {"default": rules, "tables": {table: rules}}."""
         return self.notebooks.extra(name, "proof") or {}  # type: ignore[attr-defined]
+
+    def notebook_debug_get(self, name: str) -> dict[str, Any]:
+        """The Variables pane's saved choices: watch expressions (not their values) and the names
+        whose hidden-state warning was ignored for this notebook."""
+        saved = self.notebooks.extra(name, "debug") or {}  # type: ignore[attr-defined]
+        return {"watches": list(saved.get("watches") or []), "ignore_hidden": list(saved.get("ignore_hidden") or [])}
+
+    def notebook_debug_set(self, name: str, watches: list[str] | None = None,
+                           ignore_hidden: list[str] | None = None) -> dict[str, Any]:
+        """Saves what's given; None keeps the saved value."""
+        saved = self.notebook_debug_get(name)
+        if watches is not None:
+            saved["watches"] = check_watches(watches)
+        if ignore_hidden is not None:
+            if not isinstance(ignore_hidden, list) or not all(isinstance(n, str) and n.isidentifier() for n in ignore_hidden):
+                raise ValueError("ignore_hidden is a list of variable names")
+            saved["ignore_hidden"] = sorted(set(ignore_hidden))
+        self.notebooks.set_extra(name, "debug", saved if saved["watches"] or saved["ignore_hidden"] else None)  # type: ignore[attr-defined]
+        return saved
 
     def prove_rules_set(self, name: str, rules: dict[str, Any]) -> dict[str, Any]:
         rules = _normalized_rules(rules)
@@ -418,6 +438,10 @@ class ProveMixin:
             kernel.unbind_proof()
         pc.update(meter.result())
         pc["status"] = status
+        if getattr(kernel, "limit_hit", ""):
+            pc["stopped_by"] = f"the {kernel.limit_hit} limit"
+        if hasattr(kernel, "limits"):
+            pc["limits"] = kernel.limits()
         log = kernel.finish_proof(modules)
         pc["log"] = log
         return log
@@ -554,7 +578,8 @@ class ProveMixin:
             inputs=record.get("inputs") or {},
             environment=record.get("environment") or {},
             machine=record.get("machine"),
-            runs={"pc": side(pc, ("status", "seconds", "cpu_seconds", "peak_memory_mb", "failed_cell", "measured")),
+            runs={"pc": side(pc, ("status", "seconds", "cpu_seconds", "peak_memory_mb", "failed_cell", "measured",
+                                    "stopped_by", "limits")),
                   "fabric": side(fab, ("status", "total_seconds", "job_seconds", "run_seconds", "start_seconds",
                                        "item_name", "job_id", "workspace_id", "message"))},
             outputs=[{k: v for k, v in t.items() if k != "rules"} for t in record.get("tables") or []],
@@ -568,7 +593,9 @@ class ProveMixin:
 def _verdict(record: dict[str, Any], rows: list[dict[str, Any]], problems: list[str]) -> dict[str, Any]:
     failed = [w for w, s in (("this PC", record["pc"]["status"]), ("Fabric", record["fabric"]["status"])) if s != "ok"]
     if failed:
-        return {"verdict": "failed", "text": f"The run failed on {' and '.join(failed)}, so the results can't be compared.",
+        stopped = record["pc"].get("stopped_by")
+        why = f" (stopped by {stopped})" if stopped and "this PC" in failed else ""
+        return {"verdict": "failed", "text": f"The run failed on {' and '.join(failed)}{why}, so the results can't be compared.",
                 "problems": problems}
     if problems:
         return {"verdict": "inconclusive", "text": "Inconclusive: " + problems[0], "problems": problems}
